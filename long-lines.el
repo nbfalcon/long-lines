@@ -216,5 +216,11 @@ See command `long-lines-highlight-mode'."
       (font-lock-remove-keywords nil kw)))
   (font-lock-flush))
 
+(defun long-lines-goto-long-column ()
+  "Go to the part of the current line exceeding the long column."
+  (declare (interactive-only long-lines-goto-column))
+  (interactive)
+  (long-lines-goto-column (long-lines-column)))
+
 (provide 'long-lines)
 ;;; long-lines.el ends here
