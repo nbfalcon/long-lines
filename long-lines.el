@@ -56,13 +56,10 @@ line (without the trailing newline)."
     (cl-loop for line from 1 until (eobp)
              for start = (point) do (end-of-line)
              for end = (point)
-             ;; Don't use `current-column', since it reports "2" for certain
-             ;; emojis (e.g. #x1f379, "Tropical Drink"), and because it breaks
-             ;; with `page-break-lines'. As such, we must handle tabs ourselves.
-             for columns = (let ((tabs (cl-count ?\t
-                                                 (buffer-substring-no-properties
-                                                  start end))))
-                             (+ (- end start) (* tabs (1- tab-width))))
+             ;; `let'-bind `buffer-display-table' so that
+             ;; `page-break-lines-mode' and `prettify-symbols-mode' don't affect
+             ;; long lines.
+             for columns = (let (buffer-display-table) (current-column))
              if (> columns column) collect (list line columns start end)
              do (forward-line))))
 
