@@ -176,6 +176,45 @@ COLUMN defaults to `fill-column'."
   (interactive (long-lines--interactive))
   (long-lines--1 (or column (long-lines-column))
                  (format "*Long lines: %s*" (buffer-name (current-buffer)))))
+
+;;; Highlight too long parts of lines
+
+(defun long-lines-goto-column (column)
+  "Like `move-to-column', but skip trailing 0-width characters.
+Goto COLUMN."
+  (interactive (list (read-number "Column: ")))
+  (let (buffer-display-table)
+    (prog1 (move-to-column column)
+      ;; U+200B ZERO WIDTH SPACE
+      (skip-chars-forward "\u200b"))))
+
+(defface long-lines-highlight-face '((t :inherit 'error))
+  "Face used to highlight long line parts."
+  :group 'long-line)
+
+(defun long-lines-highlight-fontify (end)
+  "FUNCTION `font-lock' rule to highlight long lines until END.
+The part of a line that goes beyond function `long-lines-column'
+is highlighted.
+
+See command `long-lines-highlight-mode'."
+  (when (<= (point) end)
+    (long-lines-goto-column (long-lines-column))
+    (let ((start (point)))
+      (end-of-line)
+      (set-match-data (list start (point))))
+    (forward-line)
+    t))
+
+(define-minor-mode long-lines-highlight-mode
+  "Highlight line parts going over `long-lines-column'."
+  :init-value nil
+  :lighter nil
+  (let ((kw '((long-lines-highlight-fontify . 'long-lines-highlight-face))))
+    (if long-lines-highlight-mode
+        (font-lock-add-keywords nil kw)
+      (font-lock-remove-keywords nil kw)))
+  (font-lock-flush))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
