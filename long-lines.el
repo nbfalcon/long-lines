@@ -165,9 +165,13 @@ See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (or column (setq column (long-lines-column)))
   (long-lines--ensure)
-  (let ((buf-name (buffer-name)))
+  (let ((buf-name (buffer-name))
+        (start (point)))
     (with-current-buffer long-lines--buffer
-      (long-lines--1 column buf-name t))))
+      (long-lines--1 column buf-name t))
+    ;; Save `point' so that we don't jump too far. `save-excursion' can't be
+    ;; used here, since we clear the entire buffer.
+    (goto-char start)))
 
 (defun long-lines (&optional column)
   "List lines in the current buffer longer than COLUMN.
