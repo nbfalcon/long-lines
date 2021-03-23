@@ -271,6 +271,26 @@ CAND must have been acquired using `long-lines--candidates'."
                    :candidates (long-lines--candidates)
                    :action #'long-lines--action)
         :buffer "*helm long lines*"))
+
+;;; `avy' integration
+
+(defun long-lines-avy ()
+  "Jump to long line parts using `avy'."
+  (interactive)
+  (require 'avy)
+  (declare-function avy-process "avy" (candidates &optional overlay-fn
+                                                  cleanup-fn))
+  (let* ((lines (save-restriction (narrow-to-region (window-start)
+                                                    (window-end nil t))
+                                  (long-lines-in-buffer)))
+         (candidates (save-excursion
+                       (cl-loop for (_ _ start end) in lines
+                                for pos = (progn (goto-char start)
+                                                 (long-lines-goto-column
+                                                  (long-lines-column))
+                                                 (point))
+                                collect (cons pos end)))))
+    (avy-process candidates)))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
