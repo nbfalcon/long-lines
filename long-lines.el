@@ -63,6 +63,38 @@ line (without the trailing newline)."
              if (> columns column) collect (list line columns start end)
              do (forward-line))))
 
+;;; Rendering
+
+;; `:inherit' taken from `compilation'
+(defface long-lines-line-number-face '((t :inherit font-lock-keyword-face))
+  "Face used for line numbers by `long-lines'."
+  :group 'long-lines)
+
+(defface long-lines-columns-face '((t :inherit font-lock-doc-face))
+  "Face used for column counts by `long-lines'."
+  :group 'long-lines)
+
+(defface long-lines-count-face '((t :inherit long-lines-line-number-face))
+  "Face used to display the count of long lines."
+  :group 'long-lines)
+
+(defface long-lines-column-face '((t :inherit long-lines-columns-face))
+  "Face used to display the column count by `long-lines'."
+  :group 'long-lines)
+
+(defun long-lines-render (long-line)
+  "Render a LONG-LINE to a pretty string.
+LONG-LINE must have been acquired from `long-lines-in-buffer' and
+this function must be invoked in the same buffer."
+  (cl-destructuring-bind (num columns start end) long-line
+    (format "%s:%s: %s"
+            (propertize
+             (number-to-string num)
+             'face 'long-lines-line-number-face)
+            (propertize
+             (number-to-string columns)
+             'face 'long-lines-columns-face)
+            (buffer-substring start end))))
 
 ;;; interactive visualization (`package-lint'-style)
 
@@ -101,23 +133,6 @@ Only works in the `long-lines' buffer."
 (define-derived-mode long-lines-view-mode special-mode "Long lines"
   "Minor mode for the `long-lines' buffer.")
 
-;; `:inherit' taken from `compilation'
-(defface long-lines-line-number-face '((t :inherit font-lock-keyword-face))
-  "Face used for line numbers by `long-lines'."
-  :group 'long-lines)
-
-(defface long-lines-columns-face '((t :inherit font-lock-doc-face))
-  "Face used for column counts by `long-lines'."
-  :group 'long-lines)
-
-(defface long-lines-count-face '((t :inherit long-lines-line-number-face))
-  "Face used to display the count of long lines."
-  :group 'long-lines)
-
-(defface long-lines-column-face '((t :inherit long-lines-columns-face))
-  "Face used to display the column count by `long-lines'."
-  :group 'long-lines)
-
 (defun long-lines--1 (column buffer-name &optional force)
   "Initialize the `long-lines' buffer.
 COLUMN is as in `long-lines', BUFFER-NAME is the name to be used
@@ -126,15 +141,7 @@ a `user-error' if there are no long lines."
   (let* ((lines (or (long-lines-in-buffer column)
                     (if force (ignore (message "No long lines"))
                       (user-error "No long lines"))))
-         (text (cl-loop for (num columns start end) in lines
-                        concat (format "%s:%s: %s\n"
-                                       (propertize
-                                        (number-to-string num)
-                                        'face 'long-lines-line-number-face)
-                                       (propertize
-                                        (number-to-string columns)
-                                        'face 'long-lines-columns-face)
-                                       (buffer-substring start end))))
+         (text (mapconcat #'long-lines-render lines "\n"))
          (orig-buf (current-buffer)))
     (with-current-buffer (get-buffer-create buffer-name)
       (let ((inhibit-read-only t))
@@ -145,7 +152,7 @@ a `user-error' if there are no long lines."
                                     'face 'long-lines-count-face)
                         (propertize (number-to-string column)
                                     'face 'long-lines-column-face)))
-        (save-excursion (insert text)))
+        (save-excursion (insert text "\n")))
       (long-lines-view-mode)
       (view-mode 1)
       (setq long-lines--buffer orig-buf)
@@ -221,6 +228,49 @@ See command `long-lines-highlight-mode'."
   (declare (interactive-only long-lines-goto-column))
   (interactive)
   (long-lines-goto-column (long-lines-column)))
+
+;;; `completing-read' interface (`swiper'-like)
+
+(defun long-lines--candidates ()
+  "Return a list of line candidates using `long-lines-render'."
+  (let ((lines (or (long-lines-in-buffer)
+                   (user-error "No long lines"))))
+    (mapcar #'long-lines-render lines)))
+
+(defun long-lines--action (cand)
+  "Jump to CAND.
+CAND must have been acquired using `long-lines--candidates'."
+  (save-match-data
+    (cl-assert (string-match "\\([[:digit:]]+\\):" cand))
+    (let ((line (string-to-number (match-string-no-properties 1 cand))))
+      (goto-char (point-min))
+      (forward-line (1- line)))))
+
+(defun long-lines-find ()
+  "Select a long line using `completing-read'."
+  (interactive)
+  (let ((line (completing-read "Goto long line:" (long-lines--candidates))))
+    (long-lines--action line)))
+
+(defun long-lines-find-ivy ()
+  "`long-lines-find' using `ivy'."
+  (interactive)
+  (require 'ivy)
+  (declare-function ivy-read "ivy" (prompt collection &rest --cl-rest--))
+  (ivy-read "Goto long line: " (long-lines--candidates)
+            :action #'long-lines--action
+            :caller 'long-lines-find-ivy))
+
+(defun long-lines-find-helm ()
+  "`long-lines-find' using `helm'."
+  (interactive)
+  (require 'helm)
+  (declare-function helm "helm" (&rest plist))
+  (declare-function helm-make-source "helm-source" (name class &rest args))
+  (helm :sources (helm-make-source "long lines" 'helm-source-sync
+                   :candidates (long-lines--candidates)
+                   :action #'long-lines--action)
+        :buffer "*helm long lines*"))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
