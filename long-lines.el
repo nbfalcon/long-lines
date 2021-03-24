@@ -301,6 +301,13 @@ LONG-COL is column after which lines are long (see function
 of the long line."
   (format "Line too long (%d columns > %d)" ncols long-col))
 
+(defun long-lines--point (col start)
+  "`long-lines-goto-column' COL from START.
+Return the new `point'."
+  (goto-char start)
+  (long-lines-goto-column col)
+  (point))
+
 ;;; `flycheck'
 ;;;###autoload
 (defun long-lines-flycheck-setup ()
@@ -318,14 +325,10 @@ of the long line."
                (cl-loop with long-col = (long-lines-column)
                         with lines = (long-lines-in-buffer long-col)
                         for (line ncols start end) in lines
-                        for col = (- (progn
-                                       (goto-char start)
-                                       (long-lines-goto-column long-col)
-                                       (point))
-                                     start)
+                        for off = (- (long-lines--point long-col start) start)
                         collect
                         (flycheck-error-new-at
-                         line (1+ col) 'warning
+                         line (1+ off) 'warning
                          (long-lines--format-diagnostic long-col ncols)
                          :checker checker
                          :end-column (1+ (- end start)))
@@ -346,13 +349,14 @@ CB is called to register the diagnostics."
   (declare-function flymake-make-diagnostic "flymake"
                     (buffer beg end type text
                             &optional data overlay-properties))
-  (cl-loop with long-col = (long-lines-column)
-           for (_line ncols start end) in (long-lines-in-buffer long-col)
-           collect (flymake-make-diagnostic
-                    (current-buffer) start end :warning
-                    (long-lines--format-diagnostic long-col ncols))
-           into diagnostics finally do
-           (funcall cb diagnostics)))
+  (save-excursion
+    (cl-loop with long-col = (long-lines-column)
+             for (_line ncols start end) in (long-lines-in-buffer long-col)
+             collect (flymake-make-diagnostic
+                      (current-buffer) (long-lines--point long-col start) end
+                      :warning (long-lines--format-diagnostic long-col ncols))
+             into diagnostics finally do
+             (funcall cb diagnostics))))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
