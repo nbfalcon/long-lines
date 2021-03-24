@@ -291,6 +291,68 @@ CAND must have been acquired using `long-lines--candidates'."
                                                  (point))
                                 collect (cons pos end)))))
     (avy-process candidates)))
+
+;;; error-checker integration
+
+(defun long-lines--format-diagnostic (long-col ncols)
+  "Format a \"line too long\" diagnostic message.
+LONG-COL is column after which lines are long (see function
+`long-lines-column'), while NCOLS is the actual number of columns
+of the long line."
+  (format "Line too long (%d columns > %d)" ncols long-col))
+
+;;; `flycheck'
+;;;###autoload
+(defun long-lines-flycheck-setup ()
+  "Configure the `flycheck' checker."
+  (require 'flycheck)
+  (declare-function flycheck-define-generic-checker "flycheck"
+                    (symbol docstring &rest properties))
+  (declare-function flycheck-error-new-at "flycheck" (arg1 arg2 &rest rest))
+  (declare-function flycheck-add-next-checker "flycheck"
+                    (checker next &optional append))
+  (flycheck-define-generic-checker 'long-lines
+    "`long-lines' `flycheck' checker."
+    :start (lambda (checker cb)
+             (save-excursion
+               (cl-loop with long-col = (long-lines-column)
+                        with lines = (long-lines-in-buffer long-col)
+                        for (line ncols start end) in lines
+                        for col = (- (progn
+                                       (goto-char start)
+                                       (long-lines-goto-column long-col)
+                                       (point))
+                                     start)
+                        collect
+                        (flycheck-error-new-at
+                         line (1+ col) 'warning
+                         (long-lines--format-diagnostic long-col ncols)
+                         :checker checker
+                         :end-column (1+ (- end start)))
+                        into diagnostics finally do
+                        (funcall cb 'finished diagnostics))))
+    :modes '(text-mode prog-mode))
+  ;; The Emacs style guide prefers 80 columns, so add it as next checker for
+  ;; Elisp. `long-lines-flycheck' could still be used with other checkers,
+  ;; though.
+  (flycheck-add-next-checker 'emacs-lisp 'long-lines t))
+
+;;; `flymake'
+(defun long-lines-flymake (cb &rest _args)
+  "A `flymake' backend for long-line diagnostics.
+For `flycheck', see `long-lines-flycheck-setup'.
+
+CB is called to register the diagnostics."
+  (declare-function flymake-make-diagnostic "flymake"
+                    (buffer beg end type text
+                            &optional data overlay-properties))
+  (cl-loop with long-col = (long-lines-column)
+           for (_line ncols start end) in (long-lines-in-buffer long-col)
+           collect (flymake-make-diagnostic
+                    (current-buffer) start end :warning
+                    (long-lines--format-diagnostic long-col ncols))
+           into diagnostics finally do
+           (funcall cb diagnostics)))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
