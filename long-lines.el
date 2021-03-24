@@ -188,12 +188,12 @@ COLUMN defaults to `fill-column'."
 
 (defun long-lines-goto-column (column)
   "Like `move-to-column', but skip trailing 0-width characters.
-Goto COLUMN."
+Goto COLUMN. Unlike `move-to-column', this function does not
+return the column."
   (interactive (list (read-number "Column: ")))
   (let (buffer-display-table)
-    (prog1 (move-to-column column)
-      ;; U+200B ZERO WIDTH SPACE
-      (skip-chars-forward "\u200b"))))
+    (when (> (move-to-column (1+ column)) column)
+      (forward-char -1))))
 
 (defface long-lines-highlight-face '((t :inherit 'error))
   "Face used to highlight long line parts."
