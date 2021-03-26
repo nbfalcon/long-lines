@@ -274,6 +274,13 @@ CAND must have been acquired using `long-lines--candidates'."
 
 ;;; `avy' integration
 
+(defun long-lines--point (col start)
+  "`long-lines-goto-column' COL from START.
+Return the new `point'."
+  (goto-char start)
+  (long-lines-goto-column col)
+  (point))
+
 (defun long-lines-avy ()
   "Jump to long line parts using `avy'."
   (interactive)
@@ -284,11 +291,9 @@ CAND must have been acquired using `long-lines--candidates'."
                                                     (window-end nil t))
                                   (long-lines-in-buffer)))
          (candidates (save-excursion
-                       (cl-loop for (_ _ start end) in lines
-                                for pos = (progn (goto-char start)
-                                                 (long-lines-goto-column
-                                                  (long-lines-column))
-                                                 (point))
+                       (cl-loop with long-col = (long-lines-column)
+                                for (_ _ start end) in lines
+                                for pos = (long-lines--point long-col start)
                                 collect (cons pos end)))))
     (avy-process candidates)))
 
@@ -300,13 +305,6 @@ LONG-COL is column after which lines are long (see function
 `long-lines-column'), while NCOLS is the actual number of columns
 of the long line."
   (format "Line too long (%d columns > %d)" ncols long-col))
-
-(defun long-lines--point (col start)
-  "`long-lines-goto-column' COL from START.
-Return the new `point'."
-  (goto-char start)
-  (long-lines-goto-column col)
-  (point))
 
 ;;; `flycheck'
 ;;;###autoload
