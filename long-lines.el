@@ -129,7 +129,6 @@ Only works in the `long-lines' buffer."
     (define-key map (kbd "RET") #'long-lines-goto)
     (define-key map (kbd "g") #'long-lines-update)
     map))
-
 (define-derived-mode long-lines-view-mode special-mode "Long lines"
   "Minor mode for the `long-lines' buffer.")
 
