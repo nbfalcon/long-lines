@@ -145,10 +145,11 @@ a `user-error' if there are no long lines."
     (with-current-buffer (get-buffer-create buffer-name)
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert (format "%s long lines (> %s columns) found:\n\n"
+        (insert (format "%s long line%s (> %s columns) found:\n\n"
                         (propertize (if lines (number-to-string (length lines))
                                       "No")
                                     'face 'long-lines-count-face)
+                        (if (cdr lines) "s" "")
                         (propertize (number-to-string column)
                                     'face 'long-lines-column-face)))
         (save-excursion (insert text "\n")))
