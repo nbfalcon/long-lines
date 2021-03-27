@@ -82,19 +82,36 @@ line (without the trailing newline)."
   "Face used to display the column count by `long-lines'."
   :group 'long-lines)
 
+(defface long-lines-render-highlight-face '((t :inherit error))
+  "Face used to highlight long line parts.
+Used by `long-lines-render', and such in `long-lines-find-*' and
+`long-lines'."
+  :group 'long-lines)
+
 (defun long-lines-render (long-line)
   "Render a LONG-LINE to a pretty string.
 LONG-LINE must have been acquired from `long-lines-in-buffer' and
-this function must be invoked in the same buffer."
+this function must be invoked in the same buffer.
+
+This function may move `point', and as such should be wrapped in
+`save-excursion'."
+  ;; Currently `point' ends up being LONG-COLUMN.
   (cl-destructuring-bind (num columns start end) long-line
-    (format "%s:%s: %s"
-            (propertize
-             (number-to-string num)
-             'face 'long-lines-line-number-face)
-            (propertize
-             (number-to-string columns)
-             'face 'long-lines-columns-face)
-            (buffer-substring start end))))
+    (goto-char start)
+    (let ((line (buffer-substring start end)))
+      (let ((start (point)))
+        (add-face-text-property
+         (- (progn (long-lines-goto-column (long-lines-column)) (point)) start)
+         (- end start)
+         'long-lines-render-highlight-face nil line))
+      (format "%s:%s: %s"
+              (propertize
+               (number-to-string num)
+               'face 'long-lines-line-number-face)
+              (propertize
+               (number-to-string columns)
+               'face 'long-lines-columns-face)
+              line))))
 
 ;;; interactive visualization (`package-lint'-style)
 
@@ -140,7 +157,7 @@ a `user-error' if there are no long lines."
   (let* ((lines (or (long-lines-in-buffer column)
                     (if force (ignore (message "No long lines"))
                       (user-error "No long lines"))))
-         (text (mapconcat #'long-lines-render lines "\n"))
+         (text (save-excursion (mapconcat #'long-lines-render lines "\n")))
          (orig-buf (current-buffer)))
     (with-current-buffer (get-buffer-create buffer-name)
       (let ((inhibit-read-only t))
@@ -235,7 +252,7 @@ See command `long-lines-highlight-mode'."
   "Return a list of line candidates using `long-lines-render'."
   (let ((lines (or (long-lines-in-buffer)
                    (user-error "No long lines"))))
-    (mapcar #'long-lines-render lines)))
+    (save-excursion (mapcar #'long-lines-render lines))))
 
 (defun long-lines--action (cand)
   "Jump to CAND.
