@@ -253,13 +253,13 @@ See command `long-lines-highlight-mode'."
 
 ;;; `completing-read' interface (`swiper'-like)
 
-(defun long-lines--candidates ()
+(defun long-lines--candidates (&optional column)
   "Return a list of line candidates using `long-lines-render'."
-  (let ((lines (or (long-lines-in-buffer)
-                   (user-error "No long lines")))
-        (long-col (long-lines-column)))
+  (or column (setq column (long-lines-column)))
+  (let ((lines (or (long-lines-in-buffer column)
+                   (user-error "No long lines"))))
     (save-excursion
-      (mapcar (lambda (line) (long-lines-render long-col line))
+      (mapcar (lambda (line) (long-lines-render column line))
               lines))))
 
 (defun long-lines--action (cand)
@@ -271,29 +271,30 @@ CAND must have been acquired using `long-lines--candidates'."
       (goto-char (point-min))
       (forward-line (1- line)))))
 
-(defun long-lines-find ()
+(defun long-lines-find (&optional column)
   "Select a long line using `completing-read'."
-  (interactive)
-  (let ((line (completing-read "Goto long line:" (long-lines--candidates))))
+  (interactive (long-lines--interactive))
+  (let ((line (completing-read "Goto long line:"
+                               (long-lines--candidates column))))
     (long-lines--action line)))
 
-(defun long-lines-find-ivy ()
+(defun long-lines-find-ivy (&optional column)
   "`long-lines-find' using `ivy'."
-  (interactive)
+  (interactive (long-lines--interactive))
   (require 'ivy)
   (declare-function ivy-read "ivy" (prompt collection &rest --cl-rest--))
-  (ivy-read "Goto long line: " (long-lines--candidates)
+  (ivy-read "Goto long line: " (long-lines--candidates column)
             :action #'long-lines--action
             :caller 'long-lines-find-ivy))
 
-(defun long-lines-find-helm ()
+(defun long-lines-find-helm (&optional column)
   "`long-lines-find' using `helm'."
-  (interactive)
+  (interactive (long-lines--interactive))
   (require 'helm)
   (declare-function helm "helm" (&rest plist))
   (declare-function helm-make-source "helm-source" (name class &rest args))
   (helm :sources (helm-make-source "long lines" 'helm-source-sync
-                   :candidates (long-lines--candidates)
+                   :candidates (long-lines--candidates column)
                    :action #'long-lines--action)
         :buffer "*helm long lines*"))
 
@@ -306,19 +307,19 @@ Return the new `point'."
   (long-lines-goto-column col)
   (point))
 
-(defun long-lines-avy ()
+(defun long-lines-avy (&optional column)
   "Jump to long line parts using `avy'."
-  (interactive)
+  (interactive (long-lines--interactive))
   (require 'avy)
   (declare-function avy-process "avy" (candidates &optional overlay-fn
                                                   cleanup-fn))
+  (or column (setq column (long-lines-column)))
   (let* ((lines (save-restriction (narrow-to-region (window-start)
                                                     (window-end nil t))
-                                  (long-lines-in-buffer)))
+                                  (long-lines-in-buffer column)))
          (candidates (save-excursion
-                       (cl-loop with long-col = (long-lines-column)
-                                for (_ _ start end) in lines
-                                for pos = (long-lines--point long-col start)
+                       (cl-loop for (_ _ start end) in lines
+                                for pos = (long-lines--point column start)
                                 collect (cons pos end)))))
     (avy-process candidates)))
 
