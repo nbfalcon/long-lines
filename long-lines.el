@@ -375,6 +375,60 @@ CB is called to register the diagnostics."
                       :warning (long-lines--format-diagnostic long-col ncols))
              into diagnostics finally do
              (funcall cb diagnostics))))
+
+;;; batch-mode
+(defun long-lines-batch-1 (args)
+  "Check for long lines in batch-mode.
+ARGS is a list of arguments or filenames: arguments start with
+\"--\". Available arguments are:
+
+- \"--columns=<number>\": override the long-lines column for subsequent
+  files. The default is 80.
+- \"--context=<on|off|toggle>\": print the line that is too long.
+  Defaults to on.
+
+Return non-nil if there were no long lines in any of ARGS."
+  (with-temp-buffer
+    (let ((long-col 80)
+          (context t)
+          (success t))
+      (save-match-data
+        (dolist (arg args)
+          (cond ((string-prefix-p "--columns" arg)
+                 (unless (string-match "\\`--columns=\\([[:digit:]]+\\)\\'" arg)
+                   (error "Malformed --columns: %s" arg))
+                 (setq long-col (string-to-number
+                                 (match-string-no-properties 1 arg))))
+                ((string-prefix-p "--context" arg)
+                 (unless (string-match "\\`--context=\\(on\\|off\\|toggle\\)\\'"
+                                       arg)
+                   (error "Malformed --context: %s" arg))
+                 (setq context (pcase (match-string-no-properties 1 arg)
+                                 ("on" t)
+                                 ("off" nil)
+                                 ("toggle" (not context)))))
+                ((string-prefix-p "--" arg) (error "Unknown argument %s" arg))
+                (t
+                 (insert-file-contents arg nil nil nil t)
+                 (let ((lines (long-lines-in-buffer long-col)))
+                   (when lines
+                     (pcase-dolist (`(,line ,col ,start ,end) lines)
+                       (message "%s:%d:%d%s" arg line col
+                                (if context
+                                    (concat ": " (buffer-substring-no-properties
+                                                  start end))
+                                  "")))
+                     (setq success nil)))))))
+      success)))
+
+;;;###autoload
+(defun long-lines-batch-and-exit ()
+  "Check the files on the command line for long lines.
+Calls `long-lines-batch-1' with `command-line-args-left' and
+exits Emacs. Must be run in batch-mode."
+  (unless noninteractive
+    (error "`long-lines-batch-and-exit' should only be used in batch mode"))
+  (kill-emacs (if (long-lines-batch-1 command-line-args-left) 0 1)))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
