@@ -40,7 +40,7 @@ If nil, `fill-column' is used instead."
 (defun long-lines-column ()
   "Resolve the variable `long-lines-column'.
 Fall back to `fill-column'."
-  (or long-lines-column fill-column))
+  (or long-lines-column fill-column (error "Couldn't determine long column")))
 
 (defun long-lines-in-buffer (&optional column)
   "Find lines longer than COLUMN in buffer.
