@@ -88,10 +88,13 @@ Used by `long-lines-render', and such in `long-lines-find-*' and
 `long-lines'."
   :group 'long-lines)
 
-(defun long-lines-render (long-line)
+(defun long-lines-render (long-column long-line)
   "Render a LONG-LINE to a pretty string.
 LONG-LINE must have been acquired from `long-lines-in-buffer' and
 this function must be invoked in the same buffer.
+
+LONG-COLUMN is the column longer lines that which are considered
+long.
 
 This function may move `point', and as such should be wrapped in
 `save-excursion'."
@@ -101,7 +104,7 @@ This function may move `point', and as such should be wrapped in
     (let ((line (buffer-substring start end)))
       (let ((start (point)))
         (add-face-text-property
-         (- (progn (long-lines-goto-column (long-lines-column)) (point)) start)
+         (- (progn (long-lines-goto-column long-column) (point)) start)
          (- end start)
          'long-lines-render-highlight-face nil line))
       (format "%s:%s: %s"
@@ -157,7 +160,9 @@ a `user-error' if there are no long lines."
   (let* ((lines (or (long-lines-in-buffer column)
                     (if force (ignore (message "No long lines"))
                       (user-error "No long lines"))))
-         (text (save-excursion (mapconcat #'long-lines-render lines "\n")))
+         (text (save-excursion
+                 (mapconcat (lambda (line) (long-lines-render column line))
+                            lines "\n")))
          (orig-buf (current-buffer)))
     (with-current-buffer (get-buffer-create buffer-name)
       (let ((inhibit-read-only t))
@@ -251,8 +256,11 @@ See command `long-lines-highlight-mode'."
 (defun long-lines--candidates ()
   "Return a list of line candidates using `long-lines-render'."
   (let ((lines (or (long-lines-in-buffer)
-                   (user-error "No long lines"))))
-    (save-excursion (mapcar #'long-lines-render lines))))
+                   (user-error "No long lines")))
+        (long-col (long-lines-column)))
+    (save-excursion
+      (mapcar (lambda (line) (long-lines-render long-col line))
+              lines))))
 
 (defun long-lines--action (cand)
   "Jump to CAND.
