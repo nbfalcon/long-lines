@@ -313,8 +313,6 @@ of the long line."
   (declare-function flycheck-define-generic-checker "flycheck"
                     (symbol docstring &rest properties))
   (declare-function flycheck-error-new-at "flycheck" (arg1 arg2 &rest rest))
-  (declare-function flycheck-add-next-checker "flycheck"
-                    (checker next &optional append))
   (flycheck-define-generic-checker 'long-lines
     "`long-lines' `flycheck' checker."
     :start (lambda (checker cb)
@@ -331,11 +329,7 @@ of the long line."
                          :end-column (1+ (- end start)))
                         into diagnostics finally do
                         (funcall cb 'finished diagnostics))))
-    :modes '(text-mode prog-mode))
-  ;; The Emacs style guide prefers 80 columns, so add it as next checker for
-  ;; Elisp. `long-lines-flycheck' could still be used with other checkers,
-  ;; though.
-  (flycheck-add-next-checker 'emacs-lisp 'long-lines t))
+    :modes t))
 
 ;;; `flymake'
 (defun long-lines-flymake (cb &rest _args)
