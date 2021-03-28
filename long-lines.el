@@ -376,6 +376,15 @@ CB is called to register the diagnostics."
              into diagnostics finally do
              (funcall cb diagnostics))))
 
+(defun long-lines--boolean-arg (cur arg)
+  "Resolve a boolean ARG string.
+ARG must be \"on\", \"off\" or \"toggle\". CUR is the current
+value of that argument, needed for \"toggle\"."
+  (pcase arg
+    ("on" t)
+    ("off" nil)
+    ("toggle" (not cur))))
+
 ;;; batch-mode
 (defun long-lines-batch-1 (args)
   "Check for long lines in batch-mode.
@@ -383,14 +392,17 @@ ARGS is a list of arguments or filenames: arguments start with
 \"--\". Available arguments are:
 
 - \"--columns=<number>\": override the long-lines column for subsequent
-  files. The default is 80.
+  files. Default: 80.
 - \"--context=<on|off|toggle>\": print the line that is too long.
-  Defaults to on.
+  Default: on.
+- \"--colour=<on|off|toggle>\": highlight the too-long part when
+  printing. Default: off.
 
 Return non-nil if there were no long lines in any of ARGS."
   (with-temp-buffer
     (let ((long-col 80)
           (context t)
+          (colour nil)
           (success t))
       (save-match-data
         (dolist (arg args)
@@ -403,10 +415,16 @@ Return non-nil if there were no long lines in any of ARGS."
                  (unless (string-match "\\`--context=\\(on\\|off\\|toggle\\)\\'"
                                        arg)
                    (error "Malformed --context: %s" arg))
-                 (setq context (pcase (match-string-no-properties 1 arg)
-                                 ("on" t)
-                                 ("off" nil)
-                                 ("toggle" (not context)))))
+                 (cl-callf long-lines--boolean-arg context
+                   (match-string-no-properties 1 arg)))
+                ;; Use the british spelling since --color= throws an error when
+                ;; passed to Emacs.
+                ((string-prefix-p "--colour" arg)
+                 (unless (string-match "\\`--colour=\\(on\\|off\\|toggle\\)"
+                                       arg)
+                   (error "Malformed --colour: %s" arg))
+                 (cl-callf long-lines--boolean-arg colour
+                   (match-string-no-properties 1 arg)))
                 ((string-prefix-p "--" arg) (error "Unknown argument %s" arg))
                 (t
                  (insert-file-contents arg nil nil nil t)
@@ -414,10 +432,17 @@ Return non-nil if there were no long lines in any of ARGS."
                    (when lines
                      (pcase-dolist (`(,line ,col ,start ,end) lines)
                        (message "%s:%d:%d%s" arg line col
-                                (if context
-                                    (concat ": " (buffer-substring-no-properties
-                                                  start end))
-                                  "")))
+                                (cond
+                                 ((null context) "")
+                                 (colour (goto-char start)
+                                         (long-lines-goto-column long-col)
+                                         (format "%s\033[33m%s\033[0m"
+                                                 (buffer-substring-no-properties
+                                                  start (point))
+                                                 (buffer-substring-no-properties
+                                                  (1+ (point)) end)))
+                                 (t
+                                  (buffer-substring-no-properties start end)))))
                      (setq success nil)))))))
       success)))
 
