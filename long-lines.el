@@ -376,14 +376,35 @@ CB is called to register the diagnostics."
              into diagnostics finally do
              (funcall cb diagnostics))))
 
-(defun long-lines--boolean-arg (cur arg)
-  "Resolve a boolean ARG string.
-ARG must be \"on\", \"off\" or \"toggle\". CUR is the current
-value of that argument, needed for \"toggle\"."
-  (pcase arg
-    ("on" t)
-    ("off" nil)
-    ("toggle" (not cur))))
+(defun long-lines--match-arg (name value-regex kind arg)
+  "Match a long (--) ARG called NAME using VALUE-REGEX.
+KIND is used as a hint in the `error' if the user supplies a
+malformed VALUE after the =, and should state the values that the
+it can take.
+
+The passed value can be found in `match-string' 1 of ARG."
+  (unless (string-match (format "\\`--%s=\\(%s\\)\\'" name value-regex) arg)
+    (error "Malformed --%s (%s): %s" name kind arg)))
+
+(defun long-lines--boolean-arg (cur name arg)
+  "Parse a boolean ARG with NAME.
+CUR is the current value of that argument.
+
+See `long-lines--numeric-arg'."
+  (save-match-data
+    (long-lines--match-arg name "on\\|off\\|toggle" "on|off|toggle" arg)
+    (pcase (match-string-no-properties 1 arg)
+      ("on" t)
+      ("off" t)
+      ("toggle" (not cur)))))
+
+(defun long-lines--numeric-arg (name arg)
+  "Parse a numeric ARG with NAME.
+NAME is the name of the numeric switch (e.g. --tab-width) and ARG
+the actual argument passed."
+  (save-match-data
+    (long-lines--match-arg name "[[:digit:]]+" "number" arg)
+    (string-to-number (match-string-no-properties 1 arg))))
 
 ;;; batch-mode
 (defun long-lines-batch-1 (args)
@@ -391,6 +412,7 @@ value of that argument, needed for \"toggle\"."
 ARGS is a list of arguments or filenames: arguments start with
 \"--\". Available arguments are:
 
+- \"--tab-width=<number>\": override the `tab-width'. Default: 4.
 - \"--columns=<number>\": override the long-lines column for subsequent
   files. Default: 80.
 - \"--context=<on|off|toggle>\": print the line that is too long.
@@ -401,49 +423,39 @@ ARGS is a list of arguments or filenames: arguments start with
 Return non-nil if there were no long lines in any of ARGS."
   (with-temp-buffer
     (let ((long-col 80)
+          (tab-width 4)
           (context t)
           (colour nil)
           (success t))
-      (save-match-data
-        (dolist (arg args)
-          (cond ((string-prefix-p "--columns" arg)
-                 (unless (string-match "\\`--columns=\\([[:digit:]]+\\)\\'" arg)
-                   (error "Malformed --columns: %s" arg))
-                 (setq long-col (string-to-number
-                                 (match-string-no-properties 1 arg))))
-                ((string-prefix-p "--context" arg)
-                 (unless (string-match "\\`--context=\\(on\\|off\\|toggle\\)\\'"
-                                       arg)
-                   (error "Malformed --context: %s" arg))
-                 (cl-callf long-lines--boolean-arg context
-                   (match-string-no-properties 1 arg)))
-                ;; Use the british spelling since --color= throws an error when
-                ;; passed to Emacs.
-                ((string-prefix-p "--colour" arg)
-                 (unless (string-match "\\`--colour=\\(on\\|off\\|toggle\\)"
-                                       arg)
-                   (error "Malformed --colour: %s" arg))
-                 (cl-callf long-lines--boolean-arg colour
-                   (match-string-no-properties 1 arg)))
-                ((string-prefix-p "--" arg) (error "Unknown argument %s" arg))
-                (t
-                 (insert-file-contents arg nil nil nil t)
-                 (let ((lines (long-lines-in-buffer long-col)))
-                   (when lines
-                     (pcase-dolist (`(,line ,col ,start ,end) lines)
-                       (message "%s:%d:%d%s" arg line col
-                                (cond
-                                 ((null context) "")
-                                 (colour (goto-char start)
-                                         (long-lines-goto-column long-col)
-                                         (format "%s\033[33m%s\033[0m"
-                                                 (buffer-substring-no-properties
-                                                  start (point))
-                                                 (buffer-substring-no-properties
-                                                  (1+ (point)) end)))
-                                 (t
-                                  (buffer-substring-no-properties start end)))))
-                     (setq success nil)))))))
+      (dolist (arg args)
+        (cond ((string-prefix-p "--columns" arg)
+               (setq long-col (long-lines--numeric-arg "columns" arg)))
+              ((string-prefix-p "--tab-width" arg)
+               (setq tab-width (long-lines--numeric-arg "tab-width" arg)))
+              ((string-prefix-p "--context" arg)
+               (cl-callf long-lines--boolean-arg context "context" arg))
+              ;; Use the british spelling since --color= throws an error when
+              ;; passed to Emacs.
+              ((string-prefix-p "--colour" arg)
+               (cl-callf long-lines--boolean-arg colour "colour" arg))
+              ((string-prefix-p "--" arg) (error "Unknown argument %s" arg))
+              (t
+               (insert-file-contents arg nil nil nil t)
+               (let ((lines (long-lines-in-buffer long-col)))
+                 (when lines
+                   (pcase-dolist (`(,line ,col ,start ,end) lines)
+                     (message "%s:%d:%d%s" arg line col
+                              (cond
+                               ((null context) "")
+                               (colour (goto-char start)
+                                       (long-lines-goto-column long-col)
+                                       (format "%s\033[33m%s\033[0m"
+                                               (buffer-substring-no-properties
+                                                start (point))
+                                               (buffer-substring-no-properties
+                                                (1+ (point)) end)))
+                               (t (buffer-substring-no-properties start end)))))
+                   (setq success nil))))))
       success)))
 
 ;;;###autoload
