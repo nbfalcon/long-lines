@@ -442,24 +442,38 @@ such can be called in `eval-after-load' `flycheck'."
 
 ;;; `flymake'
 ;;;###autoload
-(defun long-lines-flymake (cb &rest _args)
+(cl-defun long-lines-flymake (cb &key changes-start changes-end
+                                 &allow-other-keys)
   "A `flymake' backend for long-line diagnostics.
 This function can be added to `flymake-diagnostic-functions'.
 
 For `flycheck', see `long-lines-flycheck-setup'.
 
-CB is called to register the diagnostics."
+CHANGES-START, CHANGES-END and CB are provided by `flymake'."
   (declare-function flymake-make-diagnostic "flymake"
                     (buffer beg end type text
                             &optional data overlay-properties))
   (save-excursion
-    (cl-loop with long-col = (long-lines-column)
-             for (_line ncols start end) in (long-lines-in-buffer long-col)
+    (cl-loop with long-col = (1+ (long-lines-column))
+             with region-start with region-end
+             with long-lines = (save-restriction
+                                 (when changes-start
+                                   (narrow-to-region
+                                    (setq region-start
+                                          (progn (goto-char changes-start)
+                                                 (line-beginning-position)))
+                                    (setq region-end
+                                          (progn (goto-char changes-end)
+                                                 (line-end-position)))))
+                                 (long-lines-in-buffer))
+             for (_line ncols start end) in long-lines
              collect (flymake-make-diagnostic
                       (current-buffer) (long-lines--point long-col start) end
                       :warning (long-lines--format-diagnostic long-col ncols))
              into diagnostics finally do
-             (funcall cb diagnostics))))
+             (apply cb diagnostics
+                    (when changes-start
+                      (list :region (cons region-start region-end)))))))
 
 (defun long-lines--match-arg (name value-regex kind arg)
   "Match a long (--) ARG called NAME using VALUE-REGEX.
