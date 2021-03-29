@@ -199,6 +199,7 @@ See `long-lines' for COLUMN."
     ;; used here, since we clear the entire buffer.
     (goto-char start)))
 
+;;;###autoload
 (defun long-lines (&optional column)
   "List lines in the current buffer longer than COLUMN.
 COLUMN defaults to `fill-column'."
@@ -208,6 +209,7 @@ COLUMN defaults to `fill-column'."
 
 ;;; Highlight too long parts of lines
 
+;;;###autoload
 (defun long-lines-goto-column (column)
   "Like `move-to-column', but skip trailing 0-width characters.
 Goto COLUMN. Unlike `move-to-column', this function does not
@@ -245,6 +247,7 @@ See command `long-lines-highlight-mode'."
       (font-lock-remove-keywords nil kw)))
   (font-lock-flush))
 
+;;;###autoload
 (defun long-lines-goto-long-column ()
   "Go to the part of the current line exceeding the long column."
   (declare (interactive-only long-lines-goto-column))
@@ -271,6 +274,7 @@ CAND must have been acquired using `long-lines--candidates'."
       (goto-char (point-min))
       (forward-line (1- line)))))
 
+;;;###autoload
 (defun long-lines-find (&optional column)
   "Select a long line using `completing-read'."
   (interactive (long-lines--interactive))
@@ -278,6 +282,7 @@ CAND must have been acquired using `long-lines--candidates'."
                                (long-lines--candidates column))))
     (long-lines--action line)))
 
+;;;###autoload
 (defun long-lines-find-ivy (&optional column)
   "`long-lines-find' using `ivy'."
   (interactive (long-lines--interactive))
@@ -287,6 +292,7 @@ CAND must have been acquired using `long-lines--candidates'."
             :action #'long-lines--action
             :caller 'long-lines-find-ivy))
 
+;;;###autoload
 (defun long-lines-find-helm (&optional column)
   "`long-lines-find' using `helm'."
   (interactive (long-lines--interactive))
@@ -294,8 +300,8 @@ CAND must have been acquired using `long-lines--candidates'."
   (declare-function helm "helm" (&rest plist))
   (declare-function helm-make-source "helm-source" (name class &rest args))
   (helm :sources (helm-make-source "long lines" 'helm-source-sync
-                   :candidates (long-lines--candidates column)
-                   :action #'long-lines--action)
+                                   :candidates (long-lines--candidates column)
+                                   :action #'long-lines--action)
         :buffer "*helm long lines*"))
 
 ;;; `avy' integration
@@ -307,6 +313,7 @@ Return the new `point'."
   (long-lines-goto-column col)
   (point))
 
+;;;###autoload
 (defun long-lines-avy (&optional column)
   "Jump to long line parts using `avy'."
   (interactive (long-lines--interactive))
@@ -332,33 +339,49 @@ LONG-COL is column after which lines are long (see function
 of the long line."
   (format "Line too long (%d columns > %d)" ncols long-col))
 
+(defun long-lines--flycheck-start (checker cb)
+  "`flycheck' start function using `long-lines'.
+CHECKER and CB are as documented in
+`flycheck-define-generic-checker' (:start).
+
+`flycheck' must already be loaded for this function to work.
+
+See `long-lines-flycheck-setup', which should be used to
+configure `flycheck' to use `long-lines'."
+  (declare-function flycheck-error-new-at "flycheck" (arg1 arg2 &rest rest))
+  (save-excursion
+    (cl-loop with long-col = (long-lines-column)
+             with lines = (long-lines-in-buffer long-col)
+             for (line ncols start end) in lines
+             for off = (- (long-lines--point long-col start) start)
+             collect
+             (flycheck-error-new-at
+              line (1+ off) 'warning
+              (long-lines--format-diagnostic long-col ncols)
+              :checker checker
+              :end-column (1+ (- end start)))
+             into diagnostics finally do
+             (funcall cb 'finished diagnostics))))
+
 ;;; `flycheck'
 ;;;###autoload
-(defun long-lines-flycheck-setup ()
-  "Configure the `flycheck' checker."
-  (require 'flycheck)
-  (declare-function flycheck-define-generic-checker "flycheck"
-                    (symbol docstring &rest properties))
-  (declare-function flycheck-error-new-at "flycheck" (arg1 arg2 &rest rest))
-  (flycheck-define-generic-checker 'long-lines
-    "`long-lines' `flycheck' checker."
-    :start (lambda (checker cb)
-             (save-excursion
-               (cl-loop with long-col = (long-lines-column)
-                        with lines = (long-lines-in-buffer long-col)
-                        for (line ncols start end) in lines
-                        for off = (- (long-lines--point long-col start) start)
-                        collect
-                        (flycheck-error-new-at
-                         line (1+ off) 'warning
-                         (long-lines--format-diagnostic long-col ncols)
-                         :checker checker
-                         :end-column (1+ (- end start)))
-                        into diagnostics finally do
-                        (funcall cb 'finished diagnostics))))
-    :modes t))
+(progn
+  (defun long-lines-flycheck-setup ()
+    "Configure the `flycheck' checker.
+Calling this function will not cause the entirety of `long-lines'
+to be loaded (only once the checker is actually started), and as
+such can be called in `eval-after-load' `flycheck'."
+    (autoload #'long-lines--flycheck-start "long-lines")
+    (require 'flycheck)
+    (declare-function flycheck-define-generic-checker "flycheck"
+                      (symbol docstring &rest properties))
+    (flycheck-define-generic-checker 'long-lines
+      "Check for long lines in the current buffer."
+      :start #'long-lines--flycheck-start
+      :modes t)))
 
 ;;; `flymake'
+;;;###autoload
 (defun long-lines-flymake (cb &rest _args)
   "A `flymake' backend for long-line diagnostics.
 For `flycheck', see `long-lines-flycheck-setup'.
