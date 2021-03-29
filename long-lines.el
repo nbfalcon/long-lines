@@ -426,7 +426,7 @@ Return non-nil if there were no long lines in any of ARGS."
           (colour nil)
           (success t))
       (save-match-data
-        (dolist (arg args)
+        (dolist (arg args success)
           (cond ((string-prefix-p "--columns" arg)
                  (setq long-col (long-lines--numeric-arg "columns" arg)))
                 ((string-prefix-p "--tab-width" arg)
@@ -453,9 +453,9 @@ Return non-nil if there were no long lines in any of ARGS."
                                                   start (point))
                                                  (buffer-substring-no-properties
                                                   (1+ (point)) end)))
-                                 (t (buffer-substring-no-properties start end)))))
-                     (setq success nil)))))))
-      success)))
+                                 (t
+                                  (buffer-substring-no-properties start end)))))
+                     (setq success nil))))))))))
 
 ;;;###autoload
 (defun long-lines-batch-and-exit ()
