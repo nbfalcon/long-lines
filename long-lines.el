@@ -221,6 +221,12 @@ return the column."
     (when (> (move-to-column (1+ column)) column)
       (forward-char -1))))
 
+;;;###autoload
+(defun long-lines-goto-long-column ()
+  "Go to the part of the current line exceeding the long column."
+  (interactive)
+  (long-lines-goto-column (long-lines-column)))
+
 (defface long-lines-highlight-face '((t :inherit 'error))
   "Face used to highlight long line parts."
   :group 'long-line)
@@ -232,7 +238,7 @@ is highlighted.
 
 See command `long-lines-highlight-mode'."
   (when (<= (point) end)
-    (long-lines-goto-column (long-lines-column))
+    (long-lines-goto-long-column)
     (let ((start (point)))
       (end-of-line)
       (set-match-data (list start (point))))
@@ -248,13 +254,6 @@ See command `long-lines-highlight-mode'."
         (font-lock-add-keywords nil kw)
       (font-lock-remove-keywords nil kw)))
   (font-lock-flush))
-
-;;;###autoload
-(defun long-lines-goto-long-column ()
-  "Go to the part of the current line exceeding the long column."
-  (declare (interactive-only long-lines-goto-column))
-  (interactive)
-  (long-lines-goto-column (long-lines-column)))
 
 ;;; `completing-read' interface (`swiper'-like)
 
