@@ -22,7 +22,55 @@
 
 ;;; Commentary:
 
-;; Find long lines in the current buffer and emit warnings for them.
+;; `long-lines' helps enforce line length limits, e.g. the conventional
+;; 80-column limit for Elisp.
+;;
+;; Main commands:
+;;
+;; `long-lines': `package-lint-current-buffer'-like command to list all long
+;; lines the current buffer.
+;;
+;; `long-lines-highlight-mode': highlight long line parts using `font-lock'
+;; (`long-lines-highlight-face')
+;;
+;; `long-lines-find': `swiper'-like command to jump to long lines. `ivy' and
+;; `helm' specific versions are provided as well (named with `-ivy' and `-helm'
+;; respectively).
+;;
+;; Error checker integration:
+;;
+;; `flymake': `long-lines-flymake' may be added to
+;; `flymake-diagnostic-functions'.
+;;
+;; `flycheck': `long-lines-flycheck-setup' will register a `flycheck' checker.
+;; It should be called after flycheck is loaded:
+;;
+;; (eval-after-load 'flycheck 'long-lines-flycheck-setup)
+;;
+;; `long-lines-flycheck-setup' will not cause `long-lines' to be loaded (it will
+;; be lazy-loaded when needed).
+;;
+;; Configuration:
+;;
+;; `long-lines-column' can be set to override the long line threshold (which
+;; would otherwise default to `fill-column').
+;;
+;; See `customize-group' `long-lines' for further options and the faces.
+;;
+;; CLI interface:
+;;
+;; A CLI interface is provided which can be used to check source files for long
+;; lines:
+;;
+;; $EMACS -Q -l long-lines -f `long-lines-batch-and-exit' <files...|options...>
+;;
+;; The exit status is 0 if no long lines were found, and 1 otherwise.
+;;
+;; Elisp API:
+;;
+;; `long-lines-column': get the long-line threshold for the current buffer.
+;;
+;; `long-lines-in-buffer': get a list of long lines in the current buffer.
 
 ;;; Code:
 
@@ -39,7 +87,7 @@ If nil, `fill-column' is used instead."
 
 (defun long-lines-column ()
   "Resolve the variable `long-lines-column'.
-Fall back to `fill-column'."
+Fall back to `fill-column'. `error' if this cannot be done."
   (or long-lines-column fill-column (error "Couldn't determine long column")))
 
 (defun long-lines-in-buffer (&optional column)
@@ -85,7 +133,7 @@ line (without the trailing newline)."
 (defface long-lines-render-highlight-face '((t :inherit error))
   "Face used to highlight long line parts.
 Used by `long-lines-render', and such in `long-lines-find-*' and
-`long-lines'."
+`long-lines'. It is prepended."
   :group 'long-lines)
 
 (defun long-lines-render (long-column long-line)
@@ -223,12 +271,14 @@ return the column."
 
 ;;;###autoload
 (defun long-lines-goto-long-column ()
-  "Go to the part of the current line exceeding the long column."
+  "Go to the part of the current line exceeding the long column.
+The character after `point' made the line too long."
   (interactive)
   (long-lines-goto-column (long-lines-column)))
 
 (defface long-lines-highlight-face '((t :inherit 'error))
-  "Face used to highlight long line parts."
+  "Face used to highlight long line parts.
+It is prepended."
   :group 'long-line)
 
 (defun long-lines-highlight-fontify (end)
@@ -249,7 +299,8 @@ See command `long-lines-highlight-mode'."
   "Highlight line parts going over `long-lines-column'."
   :init-value nil
   :lighter nil
-  (let ((kw '((long-lines-highlight-fontify . 'long-lines-highlight-face))))
+  (let ((kw '((long-lines-highlight-fontify
+               (0 'long-lines-highlight-face prepend)))))
     (if long-lines-highlight-mode
         (font-lock-add-keywords nil kw)
       (font-lock-remove-keywords nil kw)))
@@ -279,6 +330,9 @@ CAND must have been acquired using `long-lines--candidates'."
 ;;;###autoload
 (defun long-lines-find (&optional column)
   "Select a long line using `completing-read'.
+`ivy' and `helm'-specific versions of this command are provided:
+`long-lines-find-ivy' and `long-lines-find-helm' respectively.
+
 See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (let ((line (completing-read "Goto long line:"
@@ -390,6 +444,8 @@ such can be called in `eval-after-load' `flycheck'."
 ;;;###autoload
 (defun long-lines-flymake (cb &rest _args)
   "A `flymake' backend for long-line diagnostics.
+This function can be added to `flymake-diagnostic-functions'.
+
 For `flycheck', see `long-lines-flycheck-setup'.
 
 CB is called to register the diagnostics."
