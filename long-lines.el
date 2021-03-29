@@ -202,7 +202,9 @@ See `long-lines' for COLUMN."
 ;;;###autoload
 (defun long-lines (&optional column)
   "List lines in the current buffer longer than COLUMN.
-COLUMN defaults to `fill-column'."
+COLUMN will be prompted if the prefix ARG is specified;
+ otherwise, it is determined by calling the function
+ `long-lines-column'."
   (interactive (long-lines--interactive))
   (long-lines--1 (or column (long-lines-column))
                  (format "*Long lines: %s*" (buffer-name (current-buffer)))))
@@ -257,7 +259,8 @@ See command `long-lines-highlight-mode'."
 ;;; `completing-read' interface (`swiper'-like)
 
 (defun long-lines--candidates (&optional column)
-  "Return a list of line candidates using `long-lines-render'."
+  "Return a list of line candidates using `long-lines-render'.
+See `long-lines' for COLUMN."
   (or column (setq column (long-lines-column)))
   (let ((lines (or (long-lines-in-buffer column)
                    (user-error "No long lines"))))
@@ -276,7 +279,8 @@ CAND must have been acquired using `long-lines--candidates'."
 
 ;;;###autoload
 (defun long-lines-find (&optional column)
-  "Select a long line using `completing-read'."
+  "Select a long line using `completing-read'.
+See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (let ((line (completing-read "Goto long line:"
                                (long-lines--candidates column))))
@@ -284,7 +288,8 @@ CAND must have been acquired using `long-lines--candidates'."
 
 ;;;###autoload
 (defun long-lines-find-ivy (&optional column)
-  "`long-lines-find' using `ivy'."
+  "`long-lines-find' using `ivy'.
+See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (require 'ivy)
   (declare-function ivy-read "ivy" (prompt collection &rest --cl-rest--))
@@ -294,7 +299,8 @@ CAND must have been acquired using `long-lines--candidates'."
 
 ;;;###autoload
 (defun long-lines-find-helm (&optional column)
-  "`long-lines-find' using `helm'."
+  "`long-lines-find' using `helm'.
+See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (require 'helm)
   (declare-function helm "helm" (&rest plist))
@@ -315,7 +321,8 @@ Return the new `point'."
 
 ;;;###autoload
 (defun long-lines-avy (&optional column)
-  "Jump to long line parts using `avy'."
+  "Jump to long line parts using `avy'.
+See `long-lines' for COLUMN."
   (interactive (long-lines--interactive))
   (require 'avy)
   (declare-function avy-process "avy" (candidates &optional overlay-fn
