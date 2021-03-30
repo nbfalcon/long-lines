@@ -510,7 +510,7 @@ ARGS is a list of arguments or filenames: arguments start with
 \"--\". Available arguments are:
 
 - \"--tab-width=<number>\": override the `tab-width'. Default: 4.
-- \"--columns=<number>\": override the long-lines column for subsequent
+- \"--columns=<number>\": override the `long-lines' column for subsequent
   files. Default: 80.
 - \"--context=<on|off|toggle>\": print the line that is too long.
   Default: on.
