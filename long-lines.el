@@ -242,7 +242,7 @@ a `user-error' if there are no long lines."
 
 (defun long-lines--interactive ()
   "`interactive' function to read a column."
-  (and current-prefix-arg (list (read-number "Column: "))))
+  (and current-prefix-arg (list (read-number "Long column: "))))
 
 (defun long-lines-update (&optional column)
   "Update the current `long-lines' buffer.
@@ -413,9 +413,12 @@ configure `flycheck' to use `long-lines'."
   (save-excursion
     (cl-loop with long-col = (long-lines-column)
              with lines = (long-lines-in-buffer long-col)
-             with long-col = (1+ long-col)
+             with long-col2 = (1+ long-col)
              for (line ncols start end) in lines
-             for off = (- (long-lines--point long-col start) start)
+             ;; The column is char-based, not `move-to-column'-based, so we must
+             ;; compute the char offset; since columns are one-based, we have to
+             ;; add 1 to the offset.
+             for off = (1+ (- (long-lines--point long-col2 start) start))
              collect
              (flycheck-error-new-at
               line off 'warning
