@@ -104,13 +104,14 @@ line (without the trailing newline)."
   (or column (setq column (long-lines-column)))
   (save-excursion
     (goto-char (point-min))
-    (cl-loop for line from 1 until (eobp)
+    (cl-loop with buffer-display-table
+             for line from 1 until (eobp)
              for start = (point) do (end-of-line)
              for end = (point)
              ;; `let'-bind `buffer-display-table' so that
              ;; `page-break-lines-mode' and `prettify-symbols-mode' don't affect
              ;; long lines.
-             for columns = (let (buffer-display-table) (current-column))
+             for columns = (current-column)
              if (> columns column) collect (list line columns start end)
              do (forward-line))))
 
