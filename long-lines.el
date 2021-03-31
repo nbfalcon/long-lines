@@ -145,7 +145,7 @@ Used by `long-lines-render', and such in `long-lines-find-*' and
   "Like `move-to-column', but skip trailing 0-width characters.
 Goto COLUMN. Unlike `move-to-column', this function does not
 return the column."
-  (interactive (list (read-number "Column: ")))
+  (interactive "NMove to column (skip invisible): ")
   (let (buffer-display-table)
     (when (> (move-to-column (1+ column)) column)
       (forward-char -1))))
