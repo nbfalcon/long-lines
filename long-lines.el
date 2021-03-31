@@ -200,11 +200,13 @@ Only works in the `long-lines' buffer."
       (or (looking-at "^\\([[:digit:]]+\\):[[:digit:]]+: ")
           (user-error "Not on a long line")))
     (let ((line (string-to-number (match-string-no-properties 1)))
-          (offset (max 0 (- (point) (match-end 0)))))
+          (offset (- (point) (match-end 0))))
       (pop-to-buffer long-lines--buffer)
       (goto-char (point-min))
       (forward-line (1- line))
-      (forward-char offset)
+      (if (< offset 0)
+          (long-lines-goto-long-column)
+        (forward-char offset))
       (recenter))))
 
 (defvar long-lines-view-mode-map
