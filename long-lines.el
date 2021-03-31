@@ -28,14 +28,17 @@
 ;; Main commands:
 ;;
 ;; `long-lines': `package-lint-current-buffer'-like command to list all long
-;; lines the current buffer.
+;; lines the current buffer
 ;;
 ;; `long-lines-highlight-mode': highlight long line parts using `font-lock'
 ;; (`long-lines-highlight-face')
 ;;
+;; `long-lines-cursor-color-mode': color the cursor if it would go over the line
+;; length limit
+;;
 ;; `long-lines-find': `swiper'-like command to jump to long lines. `ivy' and
 ;; `helm' specific versions are provided as well (named with `-ivy' and `-helm'
-;; respectively).
+;; respectively)
 ;;
 ;; Error checker integration:
 ;;
@@ -569,6 +572,54 @@ exits Emacs. Must be run in batch-mode."
   (unless noninteractive
     (error "`long-lines-batch-and-exit' should only be used in batch mode"))
   (kill-emacs (if (long-lines-batch-1 command-line-args-left) 0 1)))
+
+;;; Cursor coloring
+
+(defcustom long-lines-cursor-color "red"
+  "Color for cursors that go over the long column.
+See `long-lines-cursor-color-mode'."
+  :type 'color
+  :group 'long-lines)
+
+(defvar long-lines--old-cursor-color nil
+  "Saved color for `long-lines--cursor-color-command-h'.")
+
+(defun long-lines--cursor-color-command-h ()
+  "`post-command-hook' handler to set the cursor color.
+See `long-lines-cursor-color-mode'."
+  (if (condition-case nil
+          ;; If the cursor is at the long column, inserting a character would
+          ;; make it go over the limit, so color it red.
+          (>= (let (buffer-display-table) (current-column)) (long-lines-column))
+        ;; Don't do anything if we don't have a `long-lines-column'. In this
+        ;; case, we act as if the cursor wasn't after the long column.
+        (error nil))
+      (unless long-lines--old-cursor-color
+        (setq long-lines--old-cursor-color (frame-parameter nil 'cursor-color))
+        (set-cursor-color long-lines-cursor-color))
+    (when long-lines--old-cursor-color
+      (set-cursor-color long-lines--old-cursor-color)
+      (setq long-lines--old-cursor-color nil))))
+
+;;;###autoload
+(define-minor-mode long-lines-cursor-color-mode
+  "Color the cursor if it goes over the long column.
+The cursor color will be `long-lines-cursor-color' if inserting a
+character at `point' would make the line too long.
+
+Turning this mode off will restore the cursor color for all
+frames."
+  :init-value nil
+  :lighter nil
+  :global t
+  (if long-lines-cursor-color-mode
+      (add-hook 'post-command-hook #'long-lines--cursor-color-command-h)
+    (remove-hook 'post-command-hook #'long-lines--cursor-color-command-h)
+    (when long-lines--old-cursor-color
+      (dolist (frame (frame-list))
+        (with-selected-frame frame
+          (set-cursor-color long-lines--old-cursor-color)))
+      (setq long-lines--old-cursor-color nil))))
 
 (provide 'long-lines)
 ;;; long-lines.el ends here
