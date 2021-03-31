@@ -140,6 +140,16 @@ Used by `long-lines-render', and such in `long-lines-find-*' and
 `long-lines'. It is prepended."
   :group 'long-lines)
 
+;;;###autoload
+(defun long-lines-goto-column (column)
+  "Like `move-to-column', but skip trailing 0-width characters.
+Goto COLUMN. Unlike `move-to-column', this function does not
+return the column."
+  (interactive (list (read-number "Column: ")))
+  (let (buffer-display-table)
+    (when (> (move-to-column (1+ column)) column)
+      (forward-char -1))))
+
 (defun long-lines-render (long-column long-line)
   "Render a LONG-LINE to a pretty string.
 LONG-LINE must have been acquired from `long-lines-in-buffer' and
@@ -264,16 +274,6 @@ COLUMN will be prompted if the prefix ARG is specified;
                  (format "*Long lines: %s*" (buffer-name (current-buffer)))))
 
 ;;; Highlight too long parts of lines
-
-;;;###autoload
-(defun long-lines-goto-column (column)
-  "Like `move-to-column', but skip trailing 0-width characters.
-Goto COLUMN. Unlike `move-to-column', this function does not
-return the column."
-  (interactive (list (read-number "Column: ")))
-  (let (buffer-display-table)
-    (when (> (move-to-column (1+ column)) column)
-      (forward-char -1))))
 
 ;;;###autoload
 (defun long-lines-goto-long-column ()
