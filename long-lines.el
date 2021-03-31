@@ -115,16 +115,6 @@ line (without the trailing newline)."
              if (> columns column) collect (list line columns start end)
              do (forward-line))))
 
-;;;###autoload
-(defun long-lines-goto-column (column)
-  "Like `move-to-column', but skip trailing 0-width characters.
-Goto COLUMN. Unlike `move-to-column', this function does not
-return the column."
-  (interactive (list (read-number "Column: ")))
-  (let (buffer-display-table)
-    (when (> (move-to-column (1+ column)) column)
-      (forward-char -1))))
-
 ;;; Rendering
 
 ;; `:inherit' taken from `compilation'
@@ -160,7 +150,6 @@ long.
 
 This function may move `point', and as such should be wrapped in
 `save-excursion'."
-  (cl-incf long-column)
   ;; Currently `point' ends up being LONG-COLUMN.
   (cl-destructuring-bind (num columns start end) long-line
     (goto-char start)
@@ -277,11 +266,21 @@ COLUMN will be prompted if the prefix ARG is specified;
 ;;; Highlight too long parts of lines
 
 ;;;###autoload
+(defun long-lines-goto-column (column)
+  "Like `move-to-column', but skip trailing 0-width characters.
+Goto COLUMN. Unlike `move-to-column', this function does not
+return the column."
+  (interactive (list (read-number "Column: ")))
+  (let (buffer-display-table)
+    (when (> (move-to-column (1+ column)) column)
+      (forward-char -1))))
+
+;;;###autoload
 (defun long-lines-goto-long-column ()
   "Go to the part of the current line exceeding the long column.
 The character after `point' made the line too long."
   (interactive)
-  (long-lines-goto-column (1+ (long-lines-column))))
+  (long-lines-goto-column (long-lines-column)))
 
 (defface long-lines-highlight-face '((t :inherit 'error))
   "Face used to highlight long line parts.
@@ -387,8 +386,8 @@ See `long-lines' for COLUMN."
   (require 'avy)
   (declare-function avy-process "avy" (candidates &optional overlay-fn
                                                   cleanup-fn))
-  (let* ((column (1+ (or column (long-lines-column))))
-         (lines (save-restriction (narrow-to-region (window-start)
+  (or column (setq column (long-lines-column)))
+  (let* ((lines (save-restriction (narrow-to-region (window-start)
                                                     (window-end nil t))
                                   (long-lines-in-buffer column)))
          (candidates (save-excursion
@@ -419,15 +418,14 @@ configure `flycheck' to use `long-lines'."
   (save-excursion
     (cl-loop with long-col = (long-lines-column)
              with lines = (long-lines-in-buffer long-col)
-             with long-col2 = (1+ long-col)
              for (line ncols start end) in lines
-             ;; The column is char-based, not `move-to-column'-based, so we must
-             ;; compute the char offset; since columns are one-based, we have to
-             ;; add 1 to the offset.
-             for off = (1+ (- (long-lines--point long-col2 start) start))
+             ;; The `flycheck' column is char-based, not `move-to-column'-based,
+             ;; so we must compute the char offset; since it is also 1-based,
+             ;; not 0-based, we also have to add 1 to the offset.
+             for off = (1+ (- (long-lines--point long-col start) start))
              collect
              (flycheck-error-new-at
-              line off 'warning
+              line (1+ off) 'warning
               (long-lines--format-diagnostic long-col ncols)
               :checker checker
               :end-column (1+ (- end start)))
