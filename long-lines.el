@@ -242,7 +242,7 @@ a `user-error' if there are no long lines."
       (long-lines-view-mode)
       (view-mode 1)
       (setq long-lines--buffer orig-buf)
-      (set (make-local-variable 'long-lines-column) column)
+      (setq-local long-lines-column column)
       (pop-to-buffer (current-buffer)))))
 
 (defun long-lines--interactive ()
