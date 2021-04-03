@@ -23,6 +23,8 @@ conventional 80-column limit for Elisp.
 - A minor-mode to highlight long line parts (`long-lines-highlight-mode`)
   + `M-x long-lines-find*` and `M-x long-lines` always highlight the long part,
     independently of this mode
+- A minor-mode to highlight the long part of the current line only
+  (`long-lines-highlight-mode`)
 - A `minor-mode` to color the cursor if it goes over the long column:
   `long-lines-cursor-color-mode`
 - [A CLI interface](#cli-interface)

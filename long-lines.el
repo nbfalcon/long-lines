@@ -33,6 +33,9 @@
 ;; `long-lines-highlight-mode': highlight long line parts using `font-lock'
 ;; (`long-lines-highlight-face')
 ;;
+;; `long-lines-cur-line-highlight-mode': highlight the too long part of the
+;; current line only
+;;
 ;; `long-lines-cursor-color-mode': color the cursor if it would go over the line
 ;; length limit
 ;;
@@ -311,6 +314,51 @@ See command `long-lines-highlight-mode'."
         (font-lock-add-keywords nil kw)
       (font-lock-remove-keywords nil kw)))
   (font-lock-flush))
+
+;;; `long-lines-highlight-mode' for the current line only
+
+(defface long-lines-cur-line-highlight-face
+  '((t :inherit long-lines-highlight-face))
+  "Face used by `long-lines-cur-line-highlight-mode'."
+  :group 'long-lines)
+
+(defvar-local long-lines--cur-line-overlay nil
+  "Stores the current line highlight overlay.
+See `long-lines-cur-line-highlight-mode' and
+`long-lines--highlight-cur-line-post-command-h'.")
+
+(defun long-lines--highlight-cur-line-post-command-h ()
+  "Highlight the long part of the current line.
+Added to `post-command-hook' by
+`long-lines-cur-line-highlight-mode'."
+  (when long-lines--cur-line-overlay
+    (delete-overlay long-lines--cur-line-overlay))
+  (setq long-lines--cur-line-overlay
+        (save-excursion
+          (let* ((eol-point (progn (end-of-line) (point)))
+                 (eol-col (let (buffer-display-table) (current-column)))
+                 (long-col (long-lines-column)))
+            (when (> eol-col long-col)
+              (let ((ov (make-overlay (progn (long-lines-goto-column long-col)
+                                             (point))
+                                      eol-point (current-buffer) nil t)))
+                (overlay-put ov 'face 'long-lines-cur-line-highlight-face)
+                ov))))))
+
+(define-minor-mode long-lines-cur-line-highlight-mode
+  "`long-lines-highlight-mode', but limited to the current line.
+Somewhat like `hl-line-mode' for long lines. The face used is
+`long-lines-cur-line-highlight-face'."
+  :init-value nil
+  :lighter nil
+  (if long-lines-cur-line-highlight-mode
+      (add-hook 'post-command-hook
+                #'long-lines--highlight-cur-line-post-command-h nil t)
+    (remove-hook 'post-command-hook
+                 #'long-lines--highlight-cur-line-post-command-h t)
+    (when long-lines--cur-line-overlay
+      (delete-overlay long-lines--cur-line-overlay)
+      (setq long-lines--cur-line-overlay nil))))
 
 ;;; `completing-read' interface (`swiper'-like)
 
